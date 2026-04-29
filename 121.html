@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>四连方拼图游戏 - 三年级数学</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-cyan-50 p-5 text-center">
+    <div class="max-w-6xl mx-auto">
+        <!-- 标题 -->
+        <h1 class="text-3xl font-bold text-blue-700 mb-4">🧩 四连方拼图游戏</h1>
+        <p class="text-lg text-gray-600 mb-5">用4个小正方形拼出不同的四连方，学会有序思考、不重复、不遗漏！</p>
+        
+        <div class="flex flex-wrap justify-center gap-8 mb-5">
+            <!-- 左侧：拼图区（4×4网格） -->
+            <div class="flex flex-col items-center">
+                <h2 class="text-xl font-bold text-pink-600 mb-3">📦 拼图区（4×4网格）</h2>
+                <div id="puzzleGrid" class="w-[320px] h-[320px] bg-white border-4 border-blue-600 rounded-lg grid grid-cols-4 grid-rows-4 relative shadow-lg"></div>
+            </div>
+            
+            <!-- 右侧：工具栏 + 操作区 -->
+            <div class="flex flex-col gap-5 w-[280px]">
+                <!-- 小正方形工具箱 -->
+                <div class="bg-white p-4 rounded-xl border-3 border-pink-500 shadow-md">
+                    <h3 class="font-bold text-pink-600 mb-3">🔧 小正方形工具箱</h3>
+                    <div id="toolBox" class="flex justify-center gap-4 flex-wrap"></div>
+                </div>
+                
+                <!-- 操作按钮 -->
+                <div class="flex flex-wrap gap-2 justify-center">
+                    <button id="rotateBtn" class="bg-yellow-400 hover:bg-yellow-500 px-4 py-2 rounded-lg font-bold text-white shadow-md disabled:bg-gray-300">🔄 旋转图形</button>
+                    <button id="flipBtn" class="bg-purple-400 hover:bg-purple-500 px-4 py-2 rounded-lg font-bold text-white shadow-md disabled:bg-gray-300">↔️ 左右翻转</button>
+                    <button id="clearBtn" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-bold text-white shadow-md">🗑️ 清空拼图</button>
+                </div>
+                
+                <!-- 有序思考提示 -->
+                <div class="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-700 text-left">
+                    <h3 class="font-bold text-blue-700 mb-1">💡 有序思考小提示</h3>
+                    <p class="text-sm text-gray-700">1. 先拼一字型 → 2. 再拼L型 → 3. 然后拼田字型 → 4. 最后拼Z型</p>
+                    <p class="text-sm text-gray-700 mt-1">按顺序拼，才能不重复、不遗漏哦！</p>
+                </div>
+                
+                <!-- 已拼图形展示 -->
+                <div>
+                    <h3 class="font-bold text-green-700 mb-2">✅ 已拼出的四连方</h3>
+                    <div id="shapesGrid" class="grid grid-cols-2 gap-3 max-h-[180px] overflow-y-auto p-2 bg-white border-2 border-green-500 rounded-lg"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部控制按钮 -->
+        <div class="my-5 flex gap-3 justify-center flex-wrap">
+            <button id="showAllBtn" class="bg-green-600 hover:bg-green-700 px-5 py-3 rounded-xl text-white font-bold text-lg shadow-lg">📚 查看所有标准答案</button>
+            <button id="fullscreenBtn" class="bg-gray-700 hover:bg-gray-800 px-5 py-3 rounded-xl text-white font-bold text-lg shadow-lg">🖥️ 全屏模式</button>
+        </div>
+    </div>
+
+    <!-- 所有答案弹窗 -->
+    <div id="allSolutionsModal" class="fixed top-0 left-0 w-full h-full bg-black/70 hidden justify-center items-center z-50">
+        <div class="bg-white p-6 rounded-2xl max-w-[800px] w-[90%] max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-blue-700">📚 四连方所有标准答案（共7种）</h2>
+                <button id="closeModalBtn" class="text-2xl text-gray-500 hover:text-red-500">×</button>
+            </div>
+            <div id="allShapesContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 justify-center"></div>
+        </div>
+    </div>
+
+    <script>
+        // 基础配置
+        const GRID_SIZE = 4;        // 4×4拼图区
+        const CELL_SIZE_PX = 80;    // 每个格子像素（精准吸附）
+        const COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE'];
+        
+        // 所有标准四连方答案（教学用）
+        const ALL_TETROMINOES = [
+            [[1,1,1,1]],                                  // 一字型
+            [[1,1,1],[1,0,0]],                            // L型
+            [[1,1,1],[0,0,1]],                            // 反L型
+            [[1,1],[1,1]],                                // 田字型
+            [[0,1,1],[1,1,0]],                            // Z型
+            [[1,1,0],[0,1,1]],                            // 反Z型
+            [[0,1,0],[1,1,1]]                             // T型
+        ];
+
+        // 全局变量
+        let puzzleGrid = document.getElementById('puzzleGrid');
+        let toolBox = document.getElementById('toolBox');
+        let placedBlocks = [];
+        let selectedBlock = null;
+        let usedShapes = new Set();
+        let isDragging = false;
+        let currentDragBlock = null;
+        let dragOffset = { x: 0, y: 0 };
+
+        // 初始化4×4网格
+        function initGrid() {
+            puzzleGrid.innerHTML = '';
+            for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'border border-gray-300 bg-white transition-all';
+                    cell.style.width = `${CELL_SIZE_PX}px`;
+                    cell.style.height = `${CELL_SIZE_PX}px`;
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    puzzleGrid.appendChild(cell);
+                }
+            }
+        }
+
+        // 初始化工具箱（4个小正方形）
+        function initToolBox() {
+            toolBox.innerHTML = '';
+            for (let i = 0; i < 4; i++) {
+                createToolBlock(i);
+            }
+        }
+
+        // 创建可拖拽的小正方形
+        function createToolBlock(index) {
+            const block = document.createElement('div');
+            block.className = 'bg-blue-500 rounded-lg cursor-grab shadow-md';
+            block.style.width = `${CELL_SIZE_PX * 0.9}px`;
+            block.style.height = `${CELL_SIZE_PX * 0.9}px`;
+            block.dataset.type = 'single';
+            block.draggable = true;
+
+            // 拖拽开始
+            block.addEventListener('mousedown', startDrag);
+            block.addEventListener('dragstart', (e) => e.preventDefault());
+
+            toolBox.appendChild(block);
+        }
+
+        // 拖拽逻辑（精准吸附）
+        function startDrag(e) {
+            e.preventDefault();
+            isDragging = true;
+            const original = e.target;
+            
+            // 创建拖拽元素
+            currentDragBlock = original.cloneNode(true);
+            currentDragBlock.className = 'fixed bg-blue-500/90 rounded-lg shadow-lg cursor-grabbing z-50 pointer-events-none';
+            currentDragBlock.style.width = `${CELL_SIZE_PX * 0.9}px`;
+            currentDragBlock.style.height = `${CELL_SIZE_PX * 0.9}px`;
+            document.body.appendChild(currentDragBlock);
+
+            // 计算偏移
+            const rect = original.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+
+            // 移动/释放事件
+            document.addEventListener('mousemove', dragMove);
+            document.addEventListener('mouseup', stopDrag, { once: true });
+        }
+
+        function dragMove(e) {
+            if (!isDragging || !currentDragBlock) return;
+            currentDragBlock.style.left = `${e.clientX - dragOffset.x}px`;
+            currentDragBlock.style.top = `${e.clientY - dragOffset.y}px`;
+        }
+
+        function stopDrag(e) {
+            if (!isDragging || !currentDragBlock) {
+                cleanDrag();
+                return;
+            }
+
+            // 判断是否拖入网格区域
+            const gridRect = puzzleGrid.getBoundingClientRect();
+            const clickInGrid = (
+                e.clientX >= gridRect.left &&
+                e.clientX <= gridRect.right &&
+                e.clientY >= gridRect.top &&
+                e.clientY <= gridRect.bottom
+            );
+
+            if (clickInGrid) {
+                const col = Math.floor((e.clientX - gridRect.left) / CELL_SIZE_PX);
+                const row = Math.floor((e.clientY - gridRect.top) / CELL_SIZE_PX);
+                
+                if (row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE) {
+                    placeBlock(row, col);
+                }
+            }
+
+            cleanDrag();
+        }
+
+        function cleanDrag() {
+            isDragging = false;
+            if (currentDragBlock) {
+                document.body.removeChild(currentDragBlock);
+                currentDragBlock = null;
+            }
+            document.removeEventListener('mousemove', dragMove);
+        }
+
+        // 放置方块到网格（精准吸附）
+        function placeBlock(row, col) {
+            if (getBlockAt(row, col)) return;
+
+            const block = document.createElement('div');
+            block.className = 'absolute bg-blue-500 rounded-md border-2 border-white shadow-md transition-all';
+            block.style.width = `${CELL_SIZE_PX - 2}px`;
+            block.style.height = `${CELL_SIZE_PX - 2}px`;
+            block.style.left = `${col * CELL_SIZE_PX + 1}px`;
+            block.style.top = `${row * CELL_SIZE_PX + 1}px`;
+            block.dataset.row = row;
+            block.dataset.col = col;
+
+            // 点击选中
+            block.addEventListener('click', () => selectBlock(block));
+            puzzleGrid.appendChild(block);
+            placedBlocks.push(block);
+
+            checkCompleteShape();
+        }
+
+        // 选中/取消方块
+        function selectBlock(block) {
+            // 取消之前选中
+            if (selectedBlock) {
+                selectedBlock.classList.remove('ring-4', 'ring-yellow-400');
+            }
+            
+            selectedBlock = block === selectedBlock ? null : block;
+            
+            if (selectedBlock) {
+                selectedBlock.classList.add('ring-4', 'ring-yellow-400');
+            }
+            
+            updateButtonStates();
+        }
+
+        // 旋转/翻转功能
+        document.getElementById('rotateBtn').addEventListener('click', () => {
+            if (!selectedBlock) return;
+            selectedBlock.style.transform = selectedBlock.style.transform ? '' : 'rotate(90deg)';
+        });
+
+        document.getElementById('flipBtn').addEventListener('click', () => {
+            if (!selectedBlock) return;
+            selectedBlock.style.transform = selectedBlock.style.transform ? '' : 'scaleX(-1)';
+        });
+
+        // 清空拼图
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            puzzleGrid.querySelectorAll('.absolute').forEach(b => b.remove());
+            placedBlocks = [];
+            selectedBlock = null;
+            updateButtonStates();
+        });
+
+        // 检查是否完成四连方
+        function checkCompleteShape() {
+            if (placedBlocks.length !== 4) return;
+
+            // 获取形状矩阵
+            let minRow = 4, minCol = 4, maxRow = 0, maxCol = 0;
+            placedBlocks.forEach(b => {
+                const r = parseInt(b.dataset.row);
+                const c = parseInt(b.dataset.col);
+                minRow = Math.min(minRow, r);
+                minCol = Math.min(minCol, c);
+                maxRow = Math.max(maxRow, r);
+                maxCol = Math.max(maxCol, c);
+            });
+
+            const shape = Array.from({ length: maxRow - minRow + 1 }, () => Array(maxCol - minCol + 1).fill(0));
+            placedBlocks.forEach(b => {
+                const r = parseInt(b.dataset.row) - minRow;
+                const c = parseInt(b.dataset.col) - minCol;
+                shape[r][c] = 1;
+            });
+
+            // 去重判断
+            const key = JSON.stringify(shape);
+            if (!usedShapes.has(key)) {
+                usedShapes.add(key);
+                addShapeToGrid(shape);
+            }
+        }
+
+        // 展示已拼图形
+        function addShapeToGrid(shape) {
+            const container = document.getElementById('shapesGrid');
+            const item = document.createElement('div');
+            item.className = 'bg-white p-2 rounded-lg border-2 border-pink-500';
+            
+            const grid = document.createElement('div');
+            grid.className = 'grid gap-0.5 mx-auto';
+            grid.style.gridTemplateColumns = `repeat(${shape[0].length}, 24px)`;
+
+            shape.forEach(row => {
+                row.forEach(cell => {
+                    const div = document.createElement('div');
+                    div.className = cell ? 'bg-pink-500 rounded-sm' : 'bg-gray-100 rounded-sm';
+                    div.style.width = '24px';
+                    div.style.height = '24px';
+                    grid.appendChild(div);
+                });
+            });
+
+            item.appendChild(grid);
+            container.appendChild(item);
+        }
+
+        // 展示所有答案
+        document.getElementById('showAllBtn').addEventListener('click', () => {
+            const container = document.getElementById('allShapesContainer');
+            container.innerHTML = '';
+            ALL_TETROMINOES.forEach(shape => {
+                const item = document.createElement('div');
+                item.className = 'bg-white p-3 rounded-lg border-2 border-blue-500 text-center';
+                
+                const grid = document.createElement('div');
+                grid.className = 'grid gap-0.5 mx-auto mb-2';
+                grid.style.gridTemplateColumns = `repeat(${shape[0].length}, 30px)`;
+
+                shape.forEach(row => {
+                    row.forEach(cell => {
+                        const div = document.createElement('div');
+                        div.className = cell ? 'bg-blue-500 rounded-sm' : 'bg-gray-100 rounded-sm';
+                        div.style.width = '30px';
+                        div.style.height = '30px';
+                        grid.appendChild(div);
+                    });
+                });
+
+                item.appendChild(grid);
+                container.appendChild(item);
+            });
+            document.getElementById('allSolutionsModal').classList.remove('hidden');
+            document.getElementById('allSolutionsModal').classList.add('flex');
+        });
+
+        // 关闭答案弹窗
+        document.getElementById('closeModalBtn').addEventListener('click', () => {
+            document.getElementById('allSolutionsModal').classList.add('hidden');
+            document.getElementById('allSolutionsModal').classList.remove('flex');
+        });
+
+        // 全屏功能
+        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        // 辅助工具
+        function getBlockAt(row, col) {
+            return placedBlocks.find(b => b.dataset.row == row && b.dataset.col == col);
+        }
+
+        function updateButtonStates() {
+            const rotateBtn = document.getElementById('rotateBtn');
+            const flipBtn = document.getElementById('flipBtn');
+            rotateBtn.disabled = flipBtn.disabled = !selectedBlock;
+        }
+
+        // 启动
+        window.addEventListener('DOMContentLoaded', () => {
+            initGrid();
+            initToolBox();
+            updateButtonStates();
+        });
+    </script>
+</body>
+</html>
